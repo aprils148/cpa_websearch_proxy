@@ -14,11 +14,6 @@ upstream_url: "http://localhost:8317"
 # Path to auth file or directory (REQUIRED)
 # Directory: loads all antigravity-*.json files with auto-rotation
 # File: loads single auth file
-#
-# Auth file must contain refresh_token:
-#   {
-#     "refresh_token": "your-refresh-token"
-#   }
 auth_file: "~/.cli-proxy-api/"
 
 # Cooldown before retrying failed auth (seconds)
