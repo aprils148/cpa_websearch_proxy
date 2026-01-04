@@ -1,0 +1,28 @@
+# cpa_websearch_proxy Configuration
+
+# Host to listen on (default: 127.0.0.1)
+# Use 0.0.0.0 to listen on all interfaces (make sure you understand the security implications)
+listen_host: "127.0.0.1"
+
+# Port to listen on
+listen_port: 8318
+
+# CLIProxyAPI URL (default: http://localhost:8317)
+# All non-web_search requests will be forwarded here
+upstream_url: "http://localhost:8317"
+
+# Path to auth file or directory (REQUIRED)
+# Directory: loads all antigravity-*.json files with auto-rotation
+# File: loads single auth file
+#
+# Auth file must contain refresh_token:
+#   {
+#     "refresh_token": "your-refresh-token"
+#   }
+auth_file: "~/.cli-proxy-api/"
+
+# Cooldown before retrying failed auth (seconds)
+auth_fail_cooldown: 300
+
+# Log level: debug, info, warn, error
+log_level: "info"
