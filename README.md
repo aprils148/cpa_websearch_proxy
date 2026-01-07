@@ -5,7 +5,7 @@ A lightweight proxy that adds `web_search` support to Claude Code via Gemini's `
 ## Overview
 
 ```
-Claude Code --> cpa_websearch_proxy --> CLIProxyAPI (optional)
+Claude Code --> cpa_websearch_proxy --> CLIProxyAPI
                      |
                      +--> (web_search) --> Gemini googleSearch
 ```
