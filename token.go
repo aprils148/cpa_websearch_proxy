@@ -21,6 +21,8 @@ type TokenManager struct {
 	clientID     string
 	clientSecret string
 	httpClient   *http.Client
+	// Gemini API key mode
+	geminiAPIKey string
 }
 
 type tokenResponse struct {
@@ -44,7 +46,18 @@ func NewTokenManager(cfg *Config, authMgr *AuthManager) *TokenManager {
 		clientID:     cfg.ClientID,
 		clientSecret: cfg.ClientSecret,
 		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		geminiAPIKey: cfg.GeminiAPIKey,
 	}
+}
+
+// UseGeminiAPI returns true if using Gemini API key mode
+func (tm *TokenManager) UseGeminiAPI() bool {
+	return tm.geminiAPIKey != ""
+}
+
+// GetGeminiAPIKey returns the Gemini API key
+func (tm *TokenManager) GetGeminiAPIKey() string {
+	return tm.geminiAPIKey
 }
 
 // GetAccessToken returns a valid access token, refreshing if necessary

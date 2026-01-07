@@ -18,6 +18,10 @@ type Config struct {
 	// Upstream URL (CLIProxyAPI or direct Antigravity)
 	UpstreamURL string `yaml:"upstream_url"`
 
+	// Gemini API key for direct Gemini API access (alternative to Antigravity auth)
+	// If set, this will be used instead of Antigravity OAuth flow
+	GeminiAPIKey string `yaml:"gemini_api_key"`
+
 	// OAuth client ID for Gemini/Antigravity
 	ClientID string `yaml:"client_id"`
 
@@ -37,6 +41,9 @@ type Config struct {
 
 	// Antigravity base URL (default: production)
 	AntigravityBaseURL string `yaml:"antigravity_base_url"`
+
+	// Gemini API base URL (default: https://generativelanguage.googleapis.com)
+	GeminiAPIBaseURL string `yaml:"gemini_api_base_url"`
 
 	// Logging level: debug, info, warn, error
 	LogLevel string `yaml:"log_level"`
@@ -65,8 +72,9 @@ func LoadConfig(path string) (*Config, error) {
 		ClientSecret:       DefaultClientSecret,
 		WebSearchModel:     DefaultWebSearchModel,
 		AntigravityBaseURL: DefaultAntigravityURL,
-		LogLevel:           DefaultLogLevel,
-		AuthFailCooldown:   DefaultAuthFailCooldown,
+		// GeminiAPIBaseURL defaults to UpstreamURL, set after loading
+		LogLevel:         DefaultLogLevel,
+		AuthFailCooldown: DefaultAuthFailCooldown,
 	}
 
 	// Try to load from file
@@ -87,6 +95,11 @@ func LoadConfig(path string) (*Config, error) {
 	// Override with environment variables
 	loadFromEnv(cfg)
 
+	// Set GeminiAPIBaseURL to UpstreamURL if not explicitly configured
+	if cfg.GeminiAPIBaseURL == "" {
+		cfg.GeminiAPIBaseURL = cfg.UpstreamURL
+	}
+
 	return cfg, nil
 }
 
@@ -102,6 +115,9 @@ func loadFromEnv(cfg *Config) {
 	}
 	if v := os.Getenv("UPSTREAM_URL"); v != "" {
 		cfg.UpstreamURL = v
+	}
+	if v := os.Getenv("GEMINI_API_KEY"); v != "" {
+		cfg.GeminiAPIKey = v
 	}
 	if v := os.Getenv("CLIENT_ID"); v != "" {
 		cfg.ClientID = v
@@ -123,7 +139,15 @@ func loadFromEnv(cfg *Config) {
 	if v := os.Getenv("ANTIGRAVITY_BASE_URL"); v != "" {
 		cfg.AntigravityBaseURL = v
 	}
+	if v := os.Getenv("GEMINI_API_BASE_URL"); v != "" {
+		cfg.GeminiAPIBaseURL = v
+	}
 	if v := os.Getenv("LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
 	}
+}
+
+// UseGeminiAPI returns true if Gemini API key mode should be used
+func (c *Config) UseGeminiAPI() bool {
+	return c.GeminiAPIKey != ""
 }

@@ -5,20 +5,34 @@ A lightweight proxy that adds `web_search` support to Claude Code via Gemini's `
 ## Overview
 
 ```
-Claude Code --> cpa_websearch_proxy --> CLIProxyAPI (Antigravity)
+Claude Code --> cpa_websearch_proxy --> CLIProxyAPI (optional)
                      |
                      +--> (web_search) --> Gemini googleSearch
 ```
 
 - Intercepts `web_search` tool requests and routes to Gemini
-- Forwards all other requests to CLIProxyAPI
-- Uses Antigravity auth files from CLIProxyAPI (`~/.cli-proxy-api/antigravity-*.json`)
-- Multi-auth with auto-rotation on failure
+- Forwards all other requests to upstream (CLIProxyAPI or other)
+- Supports two authentication modes:
+  - **Gemini API key** (recommended, simplest setup)
+  - **Antigravity** (via CLIProxyAPI auth files)
 
-## Prerequisites
+## Quick Start
 
-- [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) running with Antigravity login
-- Auth file from `cliproxyapi -antigravity-login`
+1. Copy and edit config file:
+   ```bash
+   cp config.example.yaml config.yaml
+   # Edit config.yaml to set gemini_api_key or auth_file
+   ```
+
+2. Run:
+   ```bash
+   ./cpa_websearch_proxy
+   ```
+
+3. Configure Claude Code:
+   ```bash
+   export ANTHROPIC_BASE_URL="http://localhost:8318"
+   ```
 
 ## Installation
 
@@ -27,18 +41,6 @@ go build .
 ```
 
 Or download from [Releases](https://github.com/aprils148/cpa_websearch_proxy/releases).
-
-## Quick Start
-
-```bash
-./cpa_websearch_proxy
-```
-
-Then configure Claude Code:
-
-```bash
-export ANTHROPIC_BASE_URL="http://localhost:8318"
-```
 
 ## Configuration
 

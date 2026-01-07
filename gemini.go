@@ -21,30 +21,40 @@ import (
 
 // GeminiClient handles web search requests via Gemini's googleSearch
 type GeminiClient struct {
-	baseURL      string
-	model        string
-	tokenManager *TokenManager
-	authManager  *AuthManager
-	httpClient   *http.Client
-	maxRetries   int
-	debug        bool
+	// Antigravity mode
+	antigravityBaseURL string
+	// Gemini API mode
+	geminiAPIBaseURL string
+	model            string
+	tokenManager     *TokenManager
+	authManager      *AuthManager
+	httpClient       *http.Client
+	maxRetries       int
+	debug            bool
 }
 
 const (
 	antigravityGeneratePath = "/v1internal:generateContent"
+	geminiAPIGeneratePath   = "/v1beta/models/%s:generateContent"
 )
 
 // NewGeminiClient creates a new Gemini client for web search
 func NewGeminiClient(cfg *Config, tm *TokenManager, am *AuthManager) *GeminiClient {
 	return &GeminiClient{
-		baseURL:      strings.TrimSuffix(cfg.AntigravityBaseURL, "/"),
-		model:        cfg.WebSearchModel,
-		tokenManager: tm,
-		authManager:  am,
-		httpClient:   &http.Client{Timeout: 120 * time.Second},
-		maxRetries:   5, // Maximum number of auth retries
-		debug:        cfg.LogLevel == "debug",
+		antigravityBaseURL: strings.TrimSuffix(cfg.AntigravityBaseURL, "/"),
+		geminiAPIBaseURL:   strings.TrimSuffix(cfg.GeminiAPIBaseURL, "/"),
+		model:              cfg.WebSearchModel,
+		tokenManager:       tm,
+		authManager:        am,
+		httpClient:         &http.Client{Timeout: 120 * time.Second},
+		maxRetries:         5, // Maximum number of auth retries
+		debug:              cfg.LogLevel == "debug",
 	}
+}
+
+// UseGeminiAPI returns true if using Gemini API key mode
+func (gc *GeminiClient) UseGeminiAPI() bool {
+	return gc.tokenManager != nil && gc.tokenManager.UseGeminiAPI()
 }
 
 // ExecuteWebSearch performs a web search using Gemini's googleSearch tool
@@ -89,22 +99,33 @@ func (gc *GeminiClient) ExecuteWebSearch(ctx context.Context, claudePayload []by
 
 // executeRequest performs a single web search request
 func (gc *GeminiClient) executeRequest(ctx context.Context, claudePayload []byte) ([]byte, error) {
-	token, err := gc.tokenManager.GetAccessToken(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get access token: %w", err)
+	var reqURL string
+	var authHeader string
+
+	if gc.UseGeminiAPI() {
+		// Gemini API mode - use API key
+		apiKey := gc.tokenManager.GetGeminiAPIKey()
+		reqURL = gc.geminiAPIBaseURL + fmt.Sprintf(geminiAPIGeneratePath, gc.model) + "?key=" + apiKey
+		// No Authorization header needed for API key mode
+	} else {
+		// Antigravity mode - use OAuth token
+		token, err := gc.tokenManager.GetAccessToken(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get access token: %w", err)
+		}
+		reqURL = gc.antigravityBaseURL + antigravityGeneratePath
+		authHeader = "Bearer " + token
 	}
 
-	// Build Gemini request with googleSearch tool and full conversation history
+	// Build request payload
 	payload, err := gc.buildRequest(claudePayload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %w", err)
 	}
 
-	reqURL := gc.baseURL + antigravityGeneratePath
-
 	// Debug: log request details
 	if gc.debug {
-		log.Printf("[DEBUG] Gemini Request URL: %s", reqURL)
+		log.Printf("[DEBUG] Gemini Request URL: %s", gc.sanitizeURL(reqURL))
 		log.Printf("[DEBUG] Gemini Request Summary: %s", summarizeGeminiRequest(payload))
 	}
 
@@ -114,13 +135,21 @@ func (gc *GeminiClient) executeRequest(ctx context.Context, claudePayload []byte
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json")
 
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
+	}
+
 	if gc.debug {
-		log.Printf("[DEBUG] Request Headers: Content-Type=%s, User-Agent=%s, Authorization=Bearer <redacted> (len=%d)",
-			"application/json", userAgent, len(token))
+		if authHeader != "" {
+			log.Printf("[DEBUG] Request Headers: Content-Type=%s, User-Agent=%s, Authorization=Bearer <redacted>",
+				"application/json", userAgent)
+		} else {
+			log.Printf("[DEBUG] Request Headers: Content-Type=%s, User-Agent=%s (API key in URL)",
+				"application/json", userAgent)
+		}
 	}
 
 	resp, err := gc.httpClient.Do(req)
@@ -155,6 +184,14 @@ func (gc *GeminiClient) executeRequest(ctx context.Context, claudePayload []byte
 	}
 
 	return body, nil
+}
+
+// sanitizeURL removes API key from URL for logging
+func (gc *GeminiClient) sanitizeURL(url string) string {
+	if idx := strings.Index(url, "?key="); idx != -1 {
+		return url[:idx] + "?key=<redacted>"
+	}
+	return url
 }
 
 // AuthError represents an authentication error
@@ -202,8 +239,8 @@ func isAuthError(err error) bool {
 	return false
 }
 
-// buildRequest constructs the Antigravity request payload for Gemini web search
-// Now accepts full Claude payload and transforms messages to Gemini format
+// buildRequest constructs the request payload for Gemini web search
+// Supports both Antigravity and Gemini API formats
 func (gc *GeminiClient) buildRequest(claudePayload []byte) (string, error) {
 	// Transform Claude messages to Gemini contents format
 	contents, err := TransformMessages(claudePayload)
@@ -233,7 +270,29 @@ func (gc *GeminiClient) buildRequest(claudePayload []byte) (string, error) {
 		return "", fmt.Errorf("failed to marshal contents: %w", err)
 	}
 
-	// Base request structure
+	if gc.UseGeminiAPI() {
+		// Gemini API format - direct API structure
+		return gc.buildGeminiAPIRequest(contentsJSON)
+	}
+
+	// Antigravity format - wrapped structure
+	return gc.buildAntigravityRequest(contentsJSON)
+}
+
+// buildGeminiAPIRequest builds request for direct Gemini API
+func (gc *GeminiClient) buildGeminiAPIRequest(contentsJSON []byte) (string, error) {
+	// Gemini API format: {"contents":[], "tools":[{"googleSearch":{}}]}
+	req := `{"contents":[],"tools":[{"googleSearch":{}}]}`
+
+	// Set contents
+	req, _ = sjson.SetRaw(req, "contents", string(contentsJSON))
+
+	return req, nil
+}
+
+// buildAntigravityRequest builds request for Antigravity API
+func (gc *GeminiClient) buildAntigravityRequest(contentsJSON []byte) (string, error) {
+	// Antigravity format: {"model":"", "request":{"contents":[], "tools":[...]}, ...}
 	req := `{"model":"","request":{"contents":[],"tools":[{"googleSearch":{}}]}}`
 
 	// Set model

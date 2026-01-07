@@ -43,9 +43,12 @@ func main() {
 		cfg.AuthFile = *authFile
 	}
 
-	// Create auth manager and load auth files
+	// Determine auth mode
+	useGeminiAPI := cfg.UseGeminiAPI()
+
+	// Create auth manager and load auth files (only for Antigravity mode)
 	var authMgr *AuthManager
-	if cfg.AuthFile != "" {
+	if !useGeminiAPI && cfg.AuthFile != "" {
 		cooldown := time.Duration(cfg.AuthFailCooldown) * time.Second
 		authMgr = NewAuthManager(cooldown)
 
@@ -65,10 +68,14 @@ func main() {
 	}
 
 	// Validate configuration
-	hasAuth := authMgr != nil && authMgr.Count() > 0
-	if !hasAuth {
-		log.Println("Warning: No auth_file configured. Web search will not work.")
-		log.Println("  Use -auth-file to specify auth files")
+	if useGeminiAPI {
+		log.Println("Using Gemini API key mode")
+	} else {
+		hasAuth := authMgr != nil && authMgr.Count() > 0
+		if !hasAuth {
+			log.Println("Warning: No auth configured. Web search will not work.")
+			log.Println("  Use -auth-file for Antigravity mode, or set GEMINI_API_KEY for Gemini API mode")
+		}
 	}
 
 	if cfg.UpstreamURL == "" {
@@ -94,8 +101,15 @@ func main() {
 	} else {
 		log.Println("Upstream:       (not configured)")
 	}
-	if authMgr != nil && authMgr.Count() > 1 {
-		log.Printf("Auth files:     %d (auto-rotate on failure)", authMgr.Count())
+	if useGeminiAPI {
+		log.Println("Auth mode:      Gemini API key")
+		log.Printf("Search model:   %s", cfg.WebSearchModel)
+	} else if authMgr != nil && authMgr.Count() > 0 {
+		log.Println("Auth mode:      Antigravity")
+		if authMgr.Count() > 1 {
+			log.Printf("Auth files:     %d (auto-rotate on failure)", authMgr.Count())
+		}
+		log.Printf("Search model:   %s", cfg.WebSearchModel)
 	}
 	log.Printf("Log level:      %s", cfg.LogLevel)
 	log.Println("----------------------------------------")
@@ -140,19 +154,31 @@ USAGE:
 
 OPTIONS:
   -port <port>        Listen port (default: 8318)
-  -auth-file <path>   Path to auth file or directory
+  -auth-file <path>   Path to auth file or directory (Antigravity mode)
   -help               Show this help message
 
 ENVIRONMENT VARIABLES:
-  UPSTREAM_URL  CLIProxyAPI URL (default: http://localhost:8317)
-  AUTH_FILE     Path to auth file or directory
-  LISTEN_HOST   Listen host (default: 127.0.0.1)
-  LISTEN_PORT   Listen port
-  LOG_LEVEL     debug, info, warn, error
+  GEMINI_API_KEY      Gemini API key (recommended, simplest setup)
+  UPSTREAM_URL        CLIProxyAPI URL (default: http://localhost:8317)
+  AUTH_FILE           Path to auth file or directory (Antigravity mode)
+  LISTEN_HOST         Listen host (default: 127.0.0.1)
+  LISTEN_PORT         Listen port
+  WEB_SEARCH_MODEL    Gemini model for web search (default: gemini-2.5-flash)
+  LOG_LEVEL           debug, info, warn, error
+
+AUTH MODES:
+  1. Gemini API key (recommended):
+     export GEMINI_API_KEY="your-api-key"
+     cpa_websearch_proxy
+
+  2. Antigravity (via CLIProxyAPI auth files):
+     cpa_websearch_proxy -auth-file ~/.cli-proxy-api/
 
 EXAMPLE:
+  # Using Gemini API key
+  export GEMINI_API_KEY="AIza..."
   export UPSTREAM_URL="http://localhost:8317"
-  cpa_websearch_proxy -auth-file ~/.cli-proxy-api/
+  cpa_websearch_proxy
 
   # Then configure Claude Code
   export ANTHROPIC_BASE_URL="http://127.0.0.1:8318"
