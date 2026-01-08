@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"context"
@@ -53,12 +53,10 @@ func ConvertToClaudeNonStream(ctx context.Context, model string, geminiResp []by
 	}
 	content = append(content, webSearchToolResult)
 
-	// 3. Citation text blocks (NEW)
+	// 3. Citation text blocks
 	groundingSupports := extractGroundingSupports(geminiResp)
 	citationBlocks := buildCitationTextBlocks(groundingSupports, webSearchResults)
-	for _, block := range citationBlocks {
-		content = append(content, block)
-	}
+	content = append(content, citationBlocks...)
 
 	// 4. text block with Gemini's response
 	if textContent != "" {

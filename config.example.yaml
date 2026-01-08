@@ -4,39 +4,23 @@
 # Use 0.0.0.0 to listen on all interfaces (make sure you understand the security implications)
 listen_host: "127.0.0.1"
 
-# Port to listen on
+# Port to listen on (default: 8318)
 listen_port: 8318
 
-# CLIProxyAPI URL (default: http://localhost:8317)
+# Upstream URL for non-web_search requests (default: http://localhost:8317)
 # All non-web_search requests will be forwarded here
 upstream_url: "http://localhost:8317"
 
-# ============================================================
-# AUTH MODE: Choose ONE of the following authentication methods
-# ============================================================
+# Gemini API Key (REQUIRED)
+# Get your API key from: https://aistudio.google.com/app/apikey
+gemini_api_key: ""
 
-# Option 1: Gemini API Key (RECOMMENDED - simplest setup)
-# By default, requests are sent to upstream_url (CLIProxy2API at localhost:8317)
-# So set your CLIProxy2API API key here, NOT a Google API key
-# gemini_api_key: "your-cliproxy2api-key"
-
-# Option 2: Antigravity (via CLIProxyAPI auth files)
-# Path to auth file or directory (REQUIRED for Antigravity mode)
-# Directory: loads all antigravity-*.json files with auto-rotation
-# File: loads single auth file
-# auth_file: "~/.cli-proxy-api/"
-
-# ============================================================
-
-# Cooldown before retrying failed auth (seconds, Antigravity mode only)
-auth_fail_cooldown: 300
-
-# Gemini model for web search
+# Gemini model for web search (default: gemini-2.5-flash)
 web_search_model: "gemini-2.5-flash"
 
-# Gemini API base URL (defaults to upstream_url)
-# Only set this if you want to use a different endpoint for Gemini API requests
+# Gemini API base URL (defaults to upstream_url if not set)
+# Set this to use official Gemini API directly: https://generativelanguage.googleapis.com
 # gemini_api_base_url: "https://generativelanguage.googleapis.com"
 
-# Log level: debug, info, warn, error
+# Log level: debug, info, warn, error (default: info)
 log_level: "info"

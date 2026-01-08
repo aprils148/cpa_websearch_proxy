@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"bytes"
@@ -20,23 +20,18 @@ const maxRequestBodyBytes int64 = 64 << 20 // 64MiB, virtually unreachable in no
 type Proxy struct {
 	cfg           *Config
 	upstreamProxy *httputil.ReverseProxy
-	tokenManager  *TokenManager
 	geminiClient  *GeminiClient
-	authManager   *AuthManager
 	urlResolver   *URLResolver
 	debug         bool
 }
 
 // NewProxy creates a new proxy instance
-func NewProxy(cfg *Config, authMgr *AuthManager) *Proxy {
-	tm := NewTokenManager(cfg, authMgr)
-	gc := NewGeminiClient(cfg, tm, authMgr)
+func NewProxy(cfg *Config) *Proxy {
+	gc := NewGeminiClient(cfg)
 
 	p := &Proxy{
 		cfg:          cfg,
-		tokenManager: tm,
 		geminiClient: gc,
-		authManager:  authMgr,
 		urlResolver:  NewURLResolver(),
 		debug:        cfg.LogLevel == "debug",
 	}
@@ -97,12 +92,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle web_search request
-	if p.authManager != nil && p.authManager.Count() > 1 {
-		log.Printf("web_search detected for model %s, routing to Gemini (using %s)",
-			model, p.authManager.GetCurrentAuthPath())
-	} else {
-		log.Printf("web_search detected for model %s, routing to Gemini", model)
-	}
+	log.Printf("web_search detected for model %s, routing to Gemini", model)
 	p.handleWebSearch(w, r, body, model)
 }
 
@@ -116,7 +106,6 @@ func (p *Proxy) proxyOrReject(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleWebSearch processes a web_search request via Gemini
-// Now passes full conversation history to Gemini for better context
 func (p *Proxy) handleWebSearch(w http.ResponseWriter, r *http.Request, body []byte, model string) {
 	ctx := r.Context()
 

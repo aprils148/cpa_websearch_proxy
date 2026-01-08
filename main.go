@@ -9,16 +9,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/cliproxyapi/cpa_websearch_proxy/internal"
 )
 
 func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "config.yaml", "Path to config file")
 	port := flag.Int("port", 0, "Listen port (overrides config)")
-	authFile := flag.String("auth-file", "", "Path to CLIProxyAPI auth file or directory")
 	showHelp := flag.Bool("help", false, "Show help message")
 	flag.Parse()
 
@@ -28,7 +28,7 @@ func main() {
 	}
 
 	// Load configuration
-	cfg, err := LoadConfig(*configPath)
+	cfg, err := internal.LoadConfig(*configPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -38,44 +38,9 @@ func main() {
 		cfg.ListenPort = *port
 	}
 
-	// Override auth file if specified on command line
-	if *authFile != "" {
-		cfg.AuthFile = *authFile
-	}
-
-	// Determine auth mode
-	useGeminiAPI := cfg.UseGeminiAPI()
-
-	// Create auth manager and load auth files (only for Antigravity mode)
-	var authMgr *AuthManager
-	if !useGeminiAPI && cfg.AuthFile != "" {
-		cooldown := time.Duration(cfg.AuthFailCooldown) * time.Second
-		authMgr = NewAuthManager(cooldown)
-
-		if err := authMgr.LoadFromDirectory(cfg.AuthFile); err != nil {
-			log.Fatalf("Failed to load auth: %v", err)
-		}
-
-		authFiles := authMgr.ListAuthFiles()
-		if len(authFiles) == 1 {
-			log.Printf("Loaded 1 auth file: %s", filepath.Base(authFiles[0]))
-		} else {
-			log.Printf("Loaded %d auth files (will rotate on failure):", len(authFiles))
-			for _, f := range authFiles {
-				log.Printf("  - %s", filepath.Base(f))
-			}
-		}
-	}
-
-	// Validate configuration
-	if useGeminiAPI {
-		log.Println("Using Gemini API key mode")
-	} else {
-		hasAuth := authMgr != nil && authMgr.Count() > 0
-		if !hasAuth {
-			log.Println("Warning: No auth configured. Web search will not work.")
-			log.Println("  Use -auth-file for Antigravity mode, or set GEMINI_API_KEY for Gemini API mode")
-		}
+	// Validate Gemini API key
+	if cfg.GeminiAPIKey == "" {
+		log.Fatal("GEMINI_API_KEY is required. Set it via environment variable or config file.")
 	}
 
 	if cfg.UpstreamURL == "" {
@@ -84,12 +49,12 @@ func main() {
 	}
 
 	// Create proxy server
-	proxy := NewProxy(cfg, authMgr)
+	proxy := internal.NewProxy(cfg)
 
 	// Print startup info
 	host := cfg.ListenHost
 	if host == "" {
-		host = DefaultListenHost
+		host = internal.DefaultListenHost
 	}
 	addr := fmt.Sprintf("%s:%d", host, cfg.ListenPort)
 	log.Println("========================================")
@@ -101,16 +66,7 @@ func main() {
 	} else {
 		log.Println("Upstream:       (not configured)")
 	}
-	if useGeminiAPI {
-		log.Println("Auth mode:      Gemini API key")
-		log.Printf("Search model:   %s", cfg.WebSearchModel)
-	} else if authMgr != nil && authMgr.Count() > 0 {
-		log.Println("Auth mode:      Antigravity")
-		if authMgr.Count() > 1 {
-			log.Printf("Auth files:     %d (auto-rotate on failure)", authMgr.Count())
-		}
-		log.Printf("Search model:   %s", cfg.WebSearchModel)
-	}
+	log.Printf("Search model:   %s", cfg.WebSearchModel)
 	log.Printf("Log level:      %s", cfg.LogLevel)
 	log.Println("----------------------------------------")
 	log.Println("Configure Claude Code:")
@@ -154,28 +110,19 @@ USAGE:
 
 OPTIONS:
   -port <port>        Listen port (default: 8318)
-  -auth-file <path>   Path to auth file or directory (Antigravity mode)
+  -config <path>      Path to config file (default: config.yaml)
   -help               Show this help message
 
 ENVIRONMENT VARIABLES:
-  GEMINI_API_KEY      Gemini API key (recommended, simplest setup)
-  UPSTREAM_URL        CLIProxyAPI URL (default: http://localhost:8317)
-  AUTH_FILE           Path to auth file or directory (Antigravity mode)
+  GEMINI_API_KEY      Gemini API key (required)
+  UPSTREAM_URL        Claude API proxy URL (default: http://localhost:8317)
   LISTEN_HOST         Listen host (default: 127.0.0.1)
-  LISTEN_PORT         Listen port
+  LISTEN_PORT         Listen port (default: 8318)
   WEB_SEARCH_MODEL    Gemini model for web search (default: gemini-2.5-flash)
-  LOG_LEVEL           debug, info, warn, error
-
-AUTH MODES:
-  1. Gemini API key (recommended):
-     export GEMINI_API_KEY="your-api-key"
-     cpa_websearch_proxy
-
-  2. Antigravity (via CLIProxyAPI auth files):
-     cpa_websearch_proxy -auth-file ~/.cli-proxy-api/
+  GEMINI_API_BASE_URL Gemini API base URL (defaults to UPSTREAM_URL)
+  LOG_LEVEL           debug, info, warn, error (default: info)
 
 EXAMPLE:
-  # Using Gemini API key
   export GEMINI_API_KEY="AIza..."
   export UPSTREAM_URL="http://localhost:8317"
   cpa_websearch_proxy

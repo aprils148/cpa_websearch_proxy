@@ -18,6 +18,7 @@ go.work.sum
 # IDE
 .idea/
 .vscode/
+.ace-tool/
 *.swp
 *.swo
 
