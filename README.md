@@ -5,16 +5,15 @@ A lightweight proxy that adds `web_search` support to Claude Code via Gemini's `
 ## Overview
 
 ```
-Claude Code --> cpa_websearch_proxy --> CLIProxyAPI
+Claude Code --> cpa_websearch_proxy --> CLIProxyAPI 
                      |
                      +--> (web_search) --> Gemini googleSearch
 ```
 
 - Intercepts `web_search` tool requests and routes to Gemini
 - Forwards all other requests to upstream (CLIProxyAPI or other)
-- Supports two authentication modes:
-  - **Gemini API key** (recommended, simplest setup)
-  - **Antigravity** (via CLIProxyAPI auth files)
+- Uses Gemini API key for authentication
+
 
 ## Quick Start
 
