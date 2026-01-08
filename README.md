@@ -1,5 +1,7 @@
 # cpa_websearch_proxy
 
+[![Release](https://img.shields.io/github/v/release/aprils148/cpa_websearch_proxy)](https://github.com/aprils148/cpa_websearch_proxy/releases)
+
 A lightweight proxy that adds `web_search` support to Claude Code via Gemini's `googleSearch`. Designed for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) with Antigravity authentication.
 
 ## Overview
