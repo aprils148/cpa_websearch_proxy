@@ -9,10 +9,10 @@ listen_port: 8318
 
 # Upstream URL for non-web_search requests (default: http://localhost:8317)
 # All non-web_search requests will be forwarded here
+# CLIProxyAPI base url
 upstream_url: "http://localhost:8317"
 
-# Gemini API Key (REQUIRED)
-# Get your API key from: https://aistudio.google.com/app/apikey
+# Gemini API Key (REQUIRED) (CLIProxyAPI API key)
 gemini_api_key: ""
 
 # Gemini model for web search (default: gemini-2.5-flash)

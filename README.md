@@ -22,7 +22,7 @@ Claude Code --> cpa_websearch_proxy --> CLIProxyAPI
 1. Copy and edit config file:
    ```bash
    cp config.example.yaml config.yaml
-   # Edit config.yaml to set gemini_api_key or auth_file
+   # Edit config.yaml to set gemini_api_key(CLIPorxyAPI Key)
    ```
 
 2. Run:
